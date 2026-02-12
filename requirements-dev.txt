@@ -1,0 +1,19 @@
+# Development dependencies (in addition to requirements in pyproject.toml)
+
+# Testing
+pytest>=8.3.0
+pytest-cov>=4.1.0
+pytest-xdist>=3.5.0
+
+# Code quality
+black>=24.1.0
+pylint>=3.0.0
+mypy>=1.8.0
+flake8>=7.0.0
+
+# Documentation
+sphinx>=7.2.0
+sphinx-rtd-theme>=2.0.0
+
+# Pre-commit hooks
+pre-commit>=3.5.0

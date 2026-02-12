@@ -1,16 +1,18 @@
 import argparse
 import json
 import time
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from rapids.detection.anomaly_model import train_isolation_forest, train_test_evaluation
+from rapids.evaluation.model_evaluation import AnomalyDetectorEvaluator
 from rapids.reasoning.engine import ReasoningEngine
 
 
-def load_dataset(csv_path, max_rows=None):
+def load_dataset(csv_path: str, max_rows: Optional[int] = None) -> Tuple[pd.DataFrame, Optional[np.ndarray]]:
     df = pd.read_csv(csv_path)
     if max_rows:
         df = df.head(max_rows)
@@ -123,25 +125,71 @@ def attack_path_accuracy(df_features, labels, host_count=20, max_hops=3):
     }
 
 
-def build_report(csv_path, max_rows, batch_size):
+def build_report(csv_path: str, max_rows: int, batch_size: int) -> Dict:
+    """
+    Build comprehensive benchmark report with cross-validation and baselines.
+    
+    Args:
+        csv_path: Path to dataset CSV.
+        max_rows: Maximum rows to use.
+        batch_size: Batch size for inference.
+        
+    Returns:
+        Dictionary with complete evaluation results.
+    """
     df_features, labels = load_dataset(csv_path, max_rows=max_rows)
 
     scaler = StandardScaler()
     features = scaler.fit_transform(df_features.values)
     model = train_isolation_forest(features, contamination=0.20)
 
+    # Benchmark detection throughput and latency
     detection = benchmark_detection(model, scaler, df_features, batch_size=batch_size)
-    false_pos = false_positive_stress(model, scaler, df_features, labels, batch_size=batch_size)
-    attack_paths = attack_path_accuracy(df_features, labels)
+    
+    # Detection metrics with standard train/test
     detection_metrics = None
     if labels is not None and len(labels) > 0:
         detection_metrics = train_test_evaluation(features, labels)
+    
+    # Cross-validation for robustness
+    cv_metrics = None
+    if labels is not None and len(labels) > 0:
+        evaluator = AnomalyDetectorEvaluator()
+        cv_metrics = evaluator.cross_validate_isolation_forest(
+            features,
+            labels,
+            contamination=0.20,
+            n_splits=5
+        )
+    
+    # Baseline models for comparison
+    baselines = {}
+    if labels is not None and len(labels) > 0:
+        evaluator = AnomalyDetectorEvaluator()
+        try:
+            baselines["random_forest_supervised"] = evaluator.baseline_random_forest(features, labels)
+        except Exception as e:
+            baselines["random_forest_supervised"] = {"error": str(e)}
+        
+        try:
+            baselines["isolation_forest_default"] = evaluator.baseline_isolation_forest_default(features, labels)
+        except Exception as e:
+            baselines["isolation_forest_default"] = {"error": str(e)}
+    
+    # False positive stress test
+    false_pos = false_positive_stress(model, scaler, df_features, labels, batch_size=batch_size)
+    
+    # Attack path accuracy
+    attack_paths = attack_path_accuracy(df_features, labels)
 
     return {
         "dataset": csv_path,
         "rows_used": len(df_features),
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "detection": detection,
         "detection_metrics": detection_metrics,
+        "cross_validation": cv_metrics,
+        "baselines": baselines,
         "false_positive_stress": false_pos,
         "attack_path_accuracy": attack_paths,
     }
