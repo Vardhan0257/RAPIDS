@@ -17,3 +17,10 @@ def setup_logger(config):
     )
 
     return logging.getLogger("rapids")
+
+
+def log_event(logger, event, **fields):
+    parts = [f"event={event}"]
+    for key, value in fields.items():
+        parts.append(f"{key}={value}")
+    logger.info(" ".join(parts))

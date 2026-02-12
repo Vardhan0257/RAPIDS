@@ -8,3 +8,20 @@ logging:
 
 dataset:
   path: datasets/sample.csv
+
+streaming:
+  max_rows: 5000
+  target_fps: 520
+  stream_name: rapids_stream
+  batch_size: 200
+  block_ms: 200
+
+redis:
+  host: localhost
+  port: 6379
+  connect_retries: 5
+  retry_delay_sec: 0.5
+
+reasoning:
+  host_count: 20
+  max_hops: 3

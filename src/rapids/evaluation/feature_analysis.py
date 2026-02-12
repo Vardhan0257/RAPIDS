@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from detection.anomaly_model import train_test_evaluation
+from rapids.detection.anomaly_model import train_test_evaluation
 
 
 def feature_impact_experiment(features, labels, feature_counts):
