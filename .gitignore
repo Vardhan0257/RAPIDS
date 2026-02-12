@@ -210,3 +210,5 @@ __marimo__/
 rapids.log
 *.pyc
 .vs/
+
+datasets/
