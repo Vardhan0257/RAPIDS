@@ -2,10 +2,9 @@ import redis
 import json
 import numpy as np
 import time
-import pandas as pd
 
 
-def run_consumer(model, scaler, feature_columns, stop_event, stream_name="rapids_stream"):
+def run_consumer(model, scaler, stream_name="rapids_stream", batch_size=100):
     r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
     last_id = "0-0"
@@ -14,38 +13,44 @@ def run_consumer(model, scaler, feature_columns, stop_event, stream_name="rapids
     flow_count = 0
     start_time = time.time()
 
-    while not stop_event.is_set():
-        results = r.xread({stream_name: last_id}, count=10, block=1000)
+    while True:
+        results = r.xread({stream_name: last_id}, count=batch_size, block=0)
 
-        if not results:
-            continue
+        batch_features = []
+        batch_ids = []
 
         for stream, messages in results:
             for msg_id, data in messages:
-                last_id = str(msg_id)
-
-                if "flow" not in data:
-                    continue
-
+                last_id = msg_id
                 flow = json.loads(data["flow"])
 
-                row_df = pd.DataFrame([flow], columns=feature_columns)
-                features = scaler.transform(row_df)
+                features = np.array(list(flow.values()))
+                batch_features.append(features)
+                batch_ids.append(msg_id)
 
-                pred = model.predict(features)[0]
-                flow_count += 1
+        if not batch_features:
+            continue
 
-                if pred == -1:
-                    print(f"[ALERT] {msg_id}")
+        # Convert to numpy batch
+        batch_features = np.array(batch_features)
+        batch_features = scaler.transform(batch_features)
 
-                # Print stats every 500 flows
-                if flow_count % 500 == 0:
-                    elapsed = time.time() - start_time
-                    fps = flow_count / elapsed
-                    print(
-                        f"[STATS] flows={flow_count} "
-                        f"time={elapsed:.2f}s "
-                        f"throughput={fps:.2f} flows/sec"
-                    )
+        t0 = time.time()
+        preds = model.predict(batch_features)
+        latency = (time.time() - t0) / len(preds)
 
-    print("[*] Consumer shutting down.")
+        for msg_id, pred in zip(batch_ids, preds):
+            flow_count += 1
+            if pred == -1:
+                print(f"[ALERT] {msg_id}")
+
+        # Stats every 1000 flows
+        if flow_count % 1000 < batch_size:
+            elapsed = time.time() - start_time
+            fps = flow_count / elapsed
+            print(
+                f"[STATS] flows={flow_count} "
+                f"time={elapsed:.2f}s "
+                f"throughput={fps:.2f} flows/sec "
+                f"avg_latency={latency*1000:.2f} ms"
+            )
