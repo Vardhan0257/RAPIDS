@@ -2,6 +2,7 @@ from core.config_loader import load_config
 from core.logger import setup_logger
 from detection.data_loader import load_and_preprocess
 from detection.anomaly_model import train_test_evaluation
+from evaluation.feature_analysis import feature_impact_experiment
 
 
 def main():
@@ -17,12 +18,19 @@ def main():
     features, labels = load_and_preprocess(dataset_path)
     logger.info(f"Feature matrix shape: {features.shape}")
 
-    logger.info("Running train/test evaluation...")
-    metrics = train_test_evaluation(features, labels)
+    logger.info("Running feature impact experiment...")
 
-    for key, value in metrics.items():
-        logger.info(f"{key}: {value:.4f}")
+    feature_counts = [10, 20, 40, 78]
+    results = feature_impact_experiment(features, labels, feature_counts)
 
+    for r in results:
+        logger.info(
+            f"features={r['feature_count']} | "
+            f"precision={r['precision']:.4f} | "
+            f"recall={r['recall']:.4f} | "
+            f"f1={r['f1_score']:.4f} | "
+            f"fpr={r['false_positive_rate']:.4f}"
+        )
 
 if __name__ == "__main__":
     main()
