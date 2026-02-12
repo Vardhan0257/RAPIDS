@@ -212,3 +212,4 @@ rapids.log
 .vs/
 
 datasets/
+*.csv
