@@ -1,0 +1,10 @@
+app:
+  name: RAPIDS
+  environment: development
+
+logging:
+  level: INFO
+  file: rapids.log
+
+dataset:
+  path: datasets/sample.csv
